@@ -11,26 +11,47 @@ export function constrain(p: Point): Point {
   }
   return q;
 }
-export function approach(p: Point, target: Point, dt: number): Point {
-  if (blocked(p, target)) {
-    const corners = [{x:-1.5,z:-1.65},{x:1.5,z:-1.65},{x:-1.5,z:1.05},{x:1.5,z:1.05}];
-    const nodes = [p, ...corners, target];
-    const costs = nodes.map(()=>Infinity); costs[0]=0;
-    const previous=nodes.map(()=>-1); const visited=new Set<number>();
-    for(let n=0;n<nodes.length;n++) {
-      let u=-1;
-      for(let i=0;i<nodes.length;i++) if(!visited.has(i)&&(u<0||costs[i]<costs[u]))u=i;
-      if(u<0||!Number.isFinite(costs[u]))break;
-      visited.add(u);
-      for(let v=0;v<nodes.length;v++) if(!blocked(nodes[u],nodes[v])) {
-        const cost=costs[u]+distance(nodes[u],nodes[v]);
-        if(cost<costs[v]){costs[v]=cost;previous[v]=u;}
+const CORNERS: Point[] = [
+  { x: -1.5, z: -1.65 },
+  { x: 1.5, z: -1.65 },
+  { x: -1.5, z: 1.05 },
+  { x: 1.5, z: 1.05 },
+];
+/**
+ * 在可见图上搜索一条不穿墙的路径（绕过中央雕塑与边界约束）。
+ * 行走自动寻路与影片转场共用，保证两种镜头都不会穿墙。
+ */
+export function routePath(from: Point, to: Point): Point[] {
+  if (!blocked(from, to)) return [from, to];
+  const nodes = [from, ...CORNERS, to];
+  const costs = nodes.map(() => Infinity);
+  costs[0] = 0;
+  const previous = nodes.map(() => -1);
+  const visited = new Set<number>();
+  for (let n = 0; n < nodes.length; n++) {
+    let u = -1;
+    for (let i = 0; i < nodes.length; i++)
+      if (!visited.has(i) && (u < 0 || costs[i] < costs[u])) u = i;
+    if (u < 0 || !Number.isFinite(costs[u])) break;
+    visited.add(u);
+    for (let v = 0; v < nodes.length; v++)
+      if (!blocked(nodes[u], nodes[v])) {
+        const cost = costs[u] + distance(nodes[u], nodes[v]);
+        if (cost < costs[v]) {
+          costs[v] = cost;
+          previous[v] = u;
+        }
       }
-    }
-    let cursor=nodes.length-1;
-    while(previous[cursor]>0)cursor=previous[cursor];
-    if(previous[cursor]===0)target=nodes[cursor];
   }
+  const last = nodes.length - 1;
+  if (previous[last] < 0) return [from, to];
+  const path: Point[] = [];
+  for (let c = last; c >= 0; c = previous[c]) path.unshift(nodes[c]);
+  return path;
+}
+export function approach(p: Point, target: Point, dt: number): Point {
+  const path = routePath(p, target);
+  if (path.length > 1) target = path[1];
   const d = distance(p, target);
   if (d < 0.04) return p;
   const k = Math.min(d, dt * 2.5) / d;
@@ -43,9 +64,12 @@ export function viewingPoint(p: Point, facing: number): Point {
   return { x: p.x + Math.sin(facing) * 2, z: p.z + Math.cos(facing) * 2 };
 }
 
-function blocked(a:Point,b:Point):boolean {
-  for(let i=0;i<=80;i++) {const t=i/80;const x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t;
-    if(Math.abs(x)<1.3&&z>-1.45&&z<.85)return true;
+function blocked(a: Point, b: Point): boolean {
+  for (let i = 0; i <= 80; i++) {
+    const t = i / 80;
+    const x = a.x + (b.x - a.x) * t,
+      z = a.z + (b.z - a.z) * t;
+    if (Math.abs(x) < 1.3 && z > -1.45 && z < 0.85) return true;
   }
   return false;
 }

@@ -6,14 +6,18 @@ export function Viewport({
   position,
   yaw,
   onSelect,
+  interactive = true,
 }: {
   position: React.RefObject<Point>;
   yaw: React.RefObject<number>;
   onSelect: (id: string) => void;
+  interactive?: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const select = useRef(onSelect);
   select.current = onSelect;
+  const live = useRef(interactive);
+  live.current = interactive;
   const [error, setError] = useState("");
   useEffect(() => {
     const el = root.current!;
@@ -42,13 +46,14 @@ export function Viewport({
       moved = 0,
       last = 0;
     const down = (e: PointerEvent) => {
+      if (!live.current) return;
       dragging = true;
       last = e.clientX;
       moved = 0;
       renderer.domElement.setPointerCapture(e.pointerId);
     };
     const move = (e: PointerEvent) => {
-      if (dragging) {
+      if (dragging && live.current) {
         const delta = e.clientX - last;
         yaw.current -= delta * 0.005;
         moved += Math.abs(delta);
@@ -57,7 +62,7 @@ export function Viewport({
     };
     const up = (e: PointerEvent) => {
       dragging = false;
-      if (moved < 5) {
+      if (moved < 5 && live.current) {
         const rect = el.getBoundingClientRect();
         const ray = new THREE.Raycaster();
         ray.setFromCamera(

@@ -7,6 +7,7 @@ export function useWalker(onPosition: (p: Point) => void) {
   const target = useRef<Point | null>(null);
   const keys = useRef(new Set<string>());
   const yaw = useRef(0);
+  const possessed = useRef(false);
   const callback = useRef(onPosition);
   callback.current = onPosition;
   useEffect(() => {
@@ -40,38 +41,40 @@ export function useWalker(onPosition: (p: Point) => void) {
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
       let p = positionRef.current;
-      const k = keys.current;
-      if (target.current) p = approach(p, target.current, dt);
-      else {
-        const f =
-          Number(k.has("w") || k.has("arrowup")) -
-          Number(k.has("s") || k.has("arrowdown"));
-        const s =
-          Number(k.has("d") || k.has("arrowright")) -
-          Number(k.has("a") || k.has("arrowleft"));
-        const length = Math.hypot(f, s) || 1;
-        p = constrain({
-          x:
-            p.x +
-            ((s * Math.cos(yaw.current) - f * Math.sin(yaw.current)) *
-              dt *
-              2.5) /
-              length,
-          z:
-            p.z +
-            ((-f * Math.cos(yaw.current) - s * Math.sin(yaw.current)) *
-              dt *
-              2.5) /
-              length,
-        });
-      }
-      if (
-        Math.hypot(p.x - positionRef.current.x, p.z - positionRef.current.z) >
-        0.0001
-      ) {
-        positionRef.current = p;
-        setPosition(p);
-        callback.current(p);
+      if (!possessed.current) {
+        const k = keys.current;
+        if (target.current) p = approach(p, target.current, dt);
+        else {
+          const f =
+            Number(k.has("w") || k.has("arrowup")) -
+            Number(k.has("s") || k.has("arrowdown"));
+          const s =
+            Number(k.has("d") || k.has("arrowright")) -
+            Number(k.has("a") || k.has("arrowleft"));
+          const length = Math.hypot(f, s) || 1;
+          p = constrain({
+            x:
+              p.x +
+              ((s * Math.cos(yaw.current) - f * Math.sin(yaw.current)) *
+                dt *
+                2.5) /
+                length,
+            z:
+              p.z +
+              ((-f * Math.cos(yaw.current) - s * Math.sin(yaw.current)) *
+                dt *
+                2.5) /
+                length,
+          });
+        }
+        if (
+          Math.hypot(p.x - positionRef.current.x, p.z - positionRef.current.z) >
+          0.0001
+        ) {
+          positionRef.current = p;
+          setPosition(p);
+          callback.current(p);
+        }
       }
       frame = requestAnimationFrame(tick);
     };
@@ -92,6 +95,21 @@ export function useWalker(onPosition: (p: Point) => void) {
     },
     stop: () => {
       target.current = null;
+    },
+    /** 回放接管：屏蔽键盘与自动寻路，位姿由影片时钟驱动 */
+    possess: () => {
+      possessed.current = true;
+      target.current = null;
+      keys.current.clear();
+    },
+    release: () => {
+      possessed.current = false;
+    },
+    setPose: (p: Point, nextYaw?: number) => {
+      positionRef.current = constrain(p);
+      if (typeof nextYaw === "number") yaw.current = nextYaw;
+      setPosition(positionRef.current);
+      callback.current(positionRef.current);
     },
   };
 }

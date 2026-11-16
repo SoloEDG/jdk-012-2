@@ -15,7 +15,9 @@ import { ArtworkList, ArtworkDetail } from "../features/catalog";
 import { TourPanel } from "../features/tours";
 import { AudioPlayer } from "../features/narration";
 import { CollectionPanel } from "../features/collection";
+import { FilmPanel } from "../features/film";
 import { artworks, artworkById } from "../shared/catalog";
+import { formatTime } from "../features/narration/lib/timeline";
 import { useGallery } from "./useGallery";
 export default function App() {
   const g = useGallery();
@@ -24,6 +26,15 @@ export default function App() {
   const [help, setHelp] = useState(false);
   const [side, setSide] = useState("works");
   const a = artworkById(g.catalog.active);
+  const filming = g.film.playback.active;
+  const startRecord = () => {
+    if (
+      g.film.recording &&
+      !window.confirm("重新录制将覆盖当前影片与剪辑，确定吗？")
+    )
+      return;
+    g.startRecording();
+  };
   return (
     <div className="app">
       <header>
@@ -100,15 +111,42 @@ export default function App() {
             >
               空间地图
             </button>
+            <button
+              className={side === "film" ? "active" : ""}
+              onClick={() => setSide("film")}
+            >
+              漫游影片
+            </button>
           </div>
           {side === "works" ? (
             <ArtworkList active={g.catalog.active} onSelect={g.go} />
-          ) : (
+          ) : side === "map" ? (
             <Map
               position={g.walker.position}
               active={g.catalog.active}
               onSelect={g.go}
               large
+            />
+          ) : (
+            <FilmPanel
+              recording={g.film.recording}
+              clips={g.film.edit.clips}
+              timeline={g.film.timeline}
+              rec={g.film.rec}
+              playback={g.film.playback}
+              segmentLabel={g.segmentLabel}
+              onStartRecord={startRecord}
+              onStopRecord={g.stopRecording}
+              onEnterPlayback={g.enterPlayback}
+              onExitPlayback={g.exitPlayback}
+              onTogglePlay={g.film.togglePlay}
+              onSeek={g.film.seek}
+              onAutoCut={g.film.autoCut}
+              onRemoveClip={g.film.removeClip}
+              onMoveClip={g.film.moveClip}
+              onReset={g.film.resetEdit}
+              onUndo={g.film.undo}
+              canUndo={g.film.canUndo}
             />
           )}
           <TourPanel
@@ -142,11 +180,16 @@ export default function App() {
               position={g.walker.positionRef}
               yaw={g.walker.yaw}
               onSelect={g.go}
+              interactive={!filming}
             />
             <div className="scene-top">
               <span>
-                <span className="live-dot" />
-                自由探索中
+                <span className={g.film.rec.active ? "live-dot rec" : "live-dot"} />
+                {g.film.rec.active
+                  ? `录制中 · ${formatTime(g.film.rec.elapsed)}`
+                  : filming
+                    ? `影片回放中 · ${g.segmentLabel}`
+                    : "自由探索中"}
               </span>
               <button
                 className="glass-button"
@@ -241,7 +284,7 @@ export default function App() {
               document={g.collection.document}
               onSelect={g.go}
               onNote={g.collection.note}
-              onToggle={g.collection.toggle}
+              onToggle={g.toggleFavorite}
             />
           ) : tab === "journeys" ? (
             <>
@@ -262,11 +305,16 @@ export default function App() {
           ) : (
             <ArtworkDetail
               id={g.catalog.active}
-              saved={g.collection.document.favorites.includes(
-                g.catalog.active || "",
-              )}
+              saved={
+                filming
+                  ? (g.frame?.favorites || []).includes(g.catalog.active || "")
+                  : g.collection.document.favorites.includes(
+                      g.catalog.active || "",
+                    )
+              }
+              locked={filming}
               onFavorite={() => {
-                if (g.catalog.active) g.collection.toggle(g.catalog.active);
+                if (g.catalog.active) g.toggleFavorite(g.catalog.active);
               }}
               onListen={() => {
                 if (g.catalog.active) g.narration.play(g.catalog.active);
@@ -293,12 +341,12 @@ export default function App() {
         </div>
       )}
       <AudioPlayer
-        state={g.narration.state}
-        caption={g.narration.caption}
+        state={filming ? g.filmAudio : g.narration.state}
+        caption={filming ? g.filmCaption : g.narration.caption}
         supported={g.narration.supported}
-        onToggle={g.narration.toggle}
-        onSeek={g.narration.seek}
-        onRate={g.narration.rate}
+        onToggle={filming ? g.film.togglePlay : g.narration.toggle}
+        onSeek={filming ? g.film.seekNarration : g.narration.seek}
+        onRate={filming ? () => {} : g.narration.rate}
       />
       {(mapOpen || help) && (
         <div

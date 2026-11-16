@@ -3,12 +3,14 @@ import { artworkById } from "../../../shared/catalog";
 export function ArtworkDetail({
   id,
   saved,
+  locked = false,
   onFavorite,
   onListen,
   onGo,
 }: {
   id: string | null;
   saved: boolean;
+  locked?: boolean;
   onFavorite: () => void;
   onListen: () => void;
   onGo: () => void;
@@ -28,6 +30,7 @@ export function ArtworkDetail({
         <button
           className={saved ? "icon-button saved" : "icon-button"}
           aria-label={saved ? "取消收藏" : "收藏作品"}
+          disabled={locked}
           onClick={onFavorite}
         >
           <Heart size={20} fill={saved ? "currentColor" : "none"} />
@@ -39,15 +42,18 @@ export function ArtworkDetail({
       <p className="medium">{a.medium}</p>
       <p className="description">{a.description}</p>
       <div className="detail-actions">
-        <button className="primary" onClick={onListen}>
+        <button className="primary" onClick={onListen} disabled={locked}>
           <Headphones size={16} />
           收听作品讲解
         </button>
-        <button className="text-button" onClick={onGo}>
+        <button className="text-button" onClick={onGo} disabled={locked}>
           前往作品
           <ArrowUpRight size={16} />
         </button>
       </div>
+      {locked && (
+        <p className="playback-lock-hint">影片回放中，展示的是录制时的收藏与讲解。</p>
+      )}
     </section>
   );
 }

@@ -55,5 +55,7 @@ export function useNarration(onEnd: () => void) {
     toggle: () => setState((s) => ({ ...s, playing: !s.playing })),
     seek: (elapsed: number) => setState((s) => ({ ...s, elapsed })),
     rate: (rate: number) => setState((s) => ({ ...s, rate })),
+    /** 回放结束后，把现场讲解状态原样恢复 */
+    restore: (next: AudioState) => setState(next),
   };
 }
